@@ -20,5 +20,5 @@ target_link_libraries(CPUPathTracer LogiSceneGraph CppGLFW)
 
 # Copy resources directory.
 add_custom_command(TARGET CPUPathTracer POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/resources ${CMAKE_CURRENT_BINARY_DIR}/resources
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/resources ${CMAKE_CURRENT_BINARY_DIR}/resources
         )
