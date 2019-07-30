@@ -2,14 +2,36 @@
 // Created by primoz on 20.7.2019.
 //
 
+#include <lodepng.h>
 #include <lsg/lsg.h>
-#include "RayIntersector.h"
+#include "ImageSampler.hpp"
+#include "RayIntersector.hpp"
+#include "Renderer.hpp"
 
 int main() {
   lsg::GLTFLoader loader;
-  std::vector<std::shared_ptr<lsg::Scene>> scenes = loader.load("./resources/cornell_box.gltf");
+  std::vector<lsg::Ref<lsg::Scene>> scenes = loader.load("./resources/cornell_box.gltf");
 
-  RayIntersector intersector(scenes[0]);
-  auto isect = intersector.intersect(lsg::Ray<float>(glm::vec3(5.0, 0.2, -0.5), glm::vec3(-1.0, 0.0, 0.0)));
-  int a = 0;
+  Renderer renderer;
+
+  /*
+  auto image = lsg::makeRef<lsg::Image>("OutImage", lsg::Format::eR8G8B8Srgb, 1024, 1024, 1);
+  lsg::ImageView<glm::u8vec3> image_view(image);
+
+  for (size_t i = 0; i < image_view.width(); i++) {
+    for (size_t j = 0; j < image_view.height(); j++) {
+      image_view.at(i, j) = glm::u8vec3(i / static_cast<float>(image_view.width()) * 255.0f,
+                                        j / static_cast<float>(image_view.height()) * 255.0, 0.0);
+    }
+  }*/
+
+  auto img = renderer.render(scenes[0], 1024, 1024);
+
+  unsigned error = lodepng::encode("mandelbrot.png", reinterpret_cast<const unsigned char*>(img->rawPixelData()), 1024,
+                                   1024, LodePNGColorType::LCT_RGB);
+
+  if (error)
+    printf("encoder error %d: %s", error, lodepng_error_text(error));
+
+  int a = 2;
 }
