@@ -16,7 +16,7 @@ lsg::Ref<lsg::Image> Renderer::render(const lsg::Ref<lsg::Scene>& scene, size_t 
 
   ImageSampler pixelSampler(width, height);
 
-  size_t spp = 100;
+  size_t spp = 500;
 
   for (size_t i = 0; i < spp; i++) {
     std::vector<PixelSample> samples = pixelSampler.generateSamples();

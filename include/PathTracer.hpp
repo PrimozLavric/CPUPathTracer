@@ -54,8 +54,9 @@ class PathTracer {
       float r2 = random(0.0f, 1.0f); // pick random number for elevation
       float r2s = glm::sqrt(r2);
 
-      glm::vec3 nl = glm::dot(intersection.normal, ray.dir()) < 0 ? intersection.normal
-                                                                  : intersection.normal * -1.0f; // front facing normal
+      glm::vec3 nl = glm::dot(intersection.normal, ray.dir()) < 0.0f
+                       ? intersection.normal
+                       : intersection.normal * -1.0f; // front facing normal
 
       glm::vec3 w = nl;
       glm::vec3 u = glm::normalize(
