@@ -25,10 +25,10 @@ int main() {
     }
   }*/
 
-  auto img = renderer.render(scenes[0], 1024, 1024);
+  auto img = renderer.render(scenes[0], 256, 256);
 
-  unsigned error = lodepng::encode("mandelbrot.png", reinterpret_cast<const unsigned char*>(img->rawPixelData()), 1024,
-                                   1024, LodePNGColorType::LCT_RGB);
+  unsigned error = lodepng::encode("out.png", reinterpret_cast<const unsigned char*>(img->rawPixelData()), 256, 256,
+                                   LodePNGColorType::LCT_RGB);
 
   if (error)
     printf("encoder error %d: %s", error, lodepng_error_text(error));
