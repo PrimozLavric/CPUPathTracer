@@ -47,29 +47,41 @@ class PathTracer {
         throw std::runtime_error("Unknown material");
       }
 
-      accColor += mask * material->emissiveFactor() * 100.0f;
+      InteractionType interaction =
+        determineInteractionType(material->roughnessFactor(), material->metallicFactor(), material->emissiveFactor());
 
-      float r1 = 2.0f * glm::pi<float>() *
-                 random(0.0f, 1.0f); // pick random number on unit circle (radius = 1, circumference = 2*Pi) for azimuth
-      float r2 = random(0.0f, 1.0f); // pick random number for elevation
-      float r2s = glm::sqrt(r2);
+      if (interaction == InteractionType::kLight) {
+        accColor = mask * material->emissiveFactor() * 100.0f;
+      } else if (interaction == InteractionType::kDiff) {
+        float r1 =
+          2.0f * glm::pi<float>() *
+          random(0.0f, 1.0f); // pick random number on unit circle (radius = 1, circumference = 2*Pi) for azimuth
+        float r2 = random(0.0f, 1.0f); // pick random number for elevation
+        float r2s = glm::sqrt(r2);
 
-      glm::vec3 nl = glm::dot(intersection.normal, ray.dir()) < 0.0f
-                       ? intersection.normal
-                       : intersection.normal * -1.0f; // front facing normal
+        glm::vec3 nl = glm::dot(intersection.normal, ray.dir()) < 0.0f
+                         ? intersection.normal
+                         : intersection.normal * -1.0f; // front facing normal
 
-      glm::vec3 w = nl;
-      glm::vec3 u = glm::normalize(
-        glm::cross((glm::abs(w.x) > 0.1f ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f)), w));
-      glm::vec3 v = glm::cross(w, u);
+        glm::vec3 w = nl;
+        glm::vec3 u = glm::normalize(
+          glm::cross((glm::abs(w.x) > 0.1f ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f)), w));
+        glm::vec3 v = glm::cross(w, u);
 
-      ray = lsg::Ray<float>(intersection.position + w * 0.0005f,
-                            glm::normalize(u * glm::cos(r1) * r2s + v * glm::sin(r1) * r2s + w * glm::sqrt(1.0f - r2)));
+        ray =
+          lsg::Ray<float>(intersection.position + w * 0.0005f,
+                          glm::normalize(u * glm::cos(r1) * r2s + v * glm::sin(r1) * r2s + w * glm::sqrt(1.0f - r2)));
 
-      mask *= glm::vec3(material->baseColorFactor());
-      mask *= glm::dot(ray.dir(), nl);
+        mask *= glm::vec3(material->baseColorFactor());
+        mask *= glm::dot(ray.dir(), nl);
+      } else if (interaction == InteractionType::kSpec) {
+        glm::vec3 nl = glm::dot(intersection.normal, ray.dir()) < 0.0f
+                         ? intersection.normal
+                         : intersection.normal * -1.0f; // front facing normal
 
-      // mask *= 2;
+        mask *= glm::vec3(material->baseColorFactor());
+        ray = lsg::Ray<float>(intersection.position + nl * 0.000005f, glm::reflect(ray.dir(), nl));
+      }
 
       // Early termination RR.
       if (glm::compMax(mask) < 0.5 && bounce > config_.rrBounces) {
@@ -88,6 +100,27 @@ class PathTracer {
     static thread_local std::mt19937 generator(std::chrono::high_resolution_clock::now().time_since_epoch().count());
     std::uniform_real_distribution<float> distribution(min, max);
     return distribution(generator);
+  }
+
+ protected:
+  enum class InteractionType { kDiff, kSpec, kLight };
+
+  InteractionType determineInteractionType(float roughnessFactor, float metallicFactor, glm::vec3 emissiveFactor) {
+    float avgEmissiveFactor = glm::compAdd(emissiveFactor) / 3.0f;
+    float maxRand = roughnessFactor + metallicFactor + avgEmissiveFactor;
+    if (maxRand == 0.0f) {
+      return InteractionType::kDiff;
+    }
+
+    float r = random(0.0f, maxRand);
+
+    if (r < roughnessFactor) {
+      return InteractionType::kDiff;
+    } else if (r < metallicFactor) {
+      return InteractionType::kSpec;
+    } else {
+      return InteractionType::kLight;
+    }
   }
 
  private:

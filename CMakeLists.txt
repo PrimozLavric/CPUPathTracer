@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 17)
 
 # Metadata
-project(CPUPathTracer VERSION 0.1.0 LANGUAGES CXX)
+project(CPUPathTracer VERSION 0.1.0 LANGUAGES CXX C)
 
 # Libraries path
 include(ExternalDependencies.cmake)
@@ -16,6 +16,9 @@ endif ()
 
 file(GLOB_RECURSE SRC_LIST "src/*.cpp")
 
+add_library(glad "src/glad.c")
+target_include_directories("glad" PRIVATE "include")
+
 add_executable(CPUPathTracer ${SRC_LIST})
 
 target_include_directories(CPUPathTracer PUBLIC
@@ -23,7 +26,7 @@ target_include_directories(CPUPathTracer PUBLIC
         $<INSTALL_INTERFACE:include>
         )
 
-target_link_libraries(CPUPathTracer LogiSceneGraph CppGLFW)
+target_link_libraries(CPUPathTracer LogiSceneGraph CppGLFW glad)
 
 # Copy resources directory.
 add_custom_command(TARGET CPUPathTracer POST_BUILD

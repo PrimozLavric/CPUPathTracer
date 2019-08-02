@@ -2,28 +2,125 @@
 // Created by primoz on 20.7.2019.
 //
 
+#include <glad/glad.h>
+#define NOREORDER
+#include <cppglfw/CppGLFW.h>
 #include <lodepng.h>
 #include <lsg/lsg.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "ImageSampler.hpp"
 #include "RayIntersector.hpp"
 #include "Renderer.hpp"
 
+static const GLfloat vertices[] = {-1.0f, -1.0f, 0.0f, 1.0f, -1.0f, 0.0f, -1.0f, 1.0f, 0.0f,
+                                   1.0f,  -1.0f, 0.0f, 1.0f, 1.0f,  0.0f, -1.0f, 1.0f, 0.0f};
+
+static const char* vertex_shader_text = "#version 450\n"
+                                        "layout(location = 0) in vec3 vPos;\n"
+                                        "layout(location = 0) out vec2 uv;\n"
+                                        "void main()\n"
+                                        "{\n"
+                                        "    uv = (vPos.xy + 1.0f) / 2.0f;"
+                                        "    gl_Position = vec4(vPos, 1.0);\n"
+                                        "}\n";
+static const char* fragment_shader_text = "#version 450\n"
+                                          "layout(location = 0) in vec2 uv;\n"
+                                          "uniform sampler2D texSampler;\n"
+                                          "out vec3 outFragColor;\n"
+                                          "void main()\n"
+                                          "{\n"
+                                          "    outFragColor = texture(texSampler, uv).rgb;\n"
+                                          "}\n";
+
+void error_callback(int error, const char* description) {
+  fprintf(stderr, "Error: %s\n", description);
+}
+
+static const size_t width = 800;
+static const size_t height = 600;
+
 int main() {
+  cppglfw::GLFWManager& glfwManager = cppglfw::GLFWManager::instance();
+  std::map<int32_t, std::variant<int32_t, std::string>> hints = {{GLFW_CONTEXT_VERSION_MAJOR, 4},
+                                                                 {GLFW_CONTEXT_VERSION_MINOR, 5},
+                                                                 {GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE},
+                                                                 {GLFW_RESIZABLE, GLFW_FALSE}};
+
+  glfwSetErrorCallback(error_callback);
+
+  cppglfw::Window window = glfwManager.createWindow("Window", 800, 600, hints);
+  window.makeContextCurrent();
+
+  if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
+    std::cout << "Failed to initialize GLAD" << std::endl;
+    return -1;
+  }
+
+  glfwManager.swapInterval(1);
+
+  GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+  glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
+  glCompileShader(vertex_shader);
+  GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
+  glCompileShader(fragment_shader);
+  GLuint program = glCreateProgram();
+  glAttachShader(program, vertex_shader);
+  glAttachShader(program, fragment_shader);
+  glLinkProgram(program);
+  glUseProgram(program);
+
+  GLuint VertexArrayID;
+  glGenVertexArrays(1, &VertexArrayID);
+  glBindVertexArray(VertexArrayID);
+  GLuint vertex_buffer;
+  glGenBuffers(1, &vertex_buffer);
+  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  GLuint vpos_location = glGetAttribLocation(program, "vPos");
+  glEnableVertexAttribArray(vpos_location);
+  glVertexAttribPointer(vpos_location, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
+
+  // Texture
+  GLuint tex;
+  glGenTextures(1, &tex);
+  glBindTexture(GL_TEXTURE_2D, tex);
+  // set the texture wrapping parameters
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  // set texture filtering parameters
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+  glUniform1i(0, 0);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, tex);
+
   lsg::GLTFLoader loader;
   std::vector<lsg::Ref<lsg::Scene>> scenes = loader.load("./resources/cornell_box.gltf");
+  Renderer renderer(scenes[0], width, height);
+
+  while (!window.shouldClose()) {
+    size_t sample = renderer.renderSample();
+    std::cout << "Sample: " << sample << std::endl;
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, renderer.getImage()->rawPixelData());
+    auto fbSize = window.getFramebufferSize();
+    glViewport(0, 0, fbSize.first, fbSize.second);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    window.swapBuffers();
+    glfwManager.pollEvents();
+  }
+}
+
+/*
+int main() {
+
+
 
   Renderer renderer;
-
-  /*
-  auto image = lsg::makeRef<lsg::Image>("OutImage", lsg::Format::eR8G8B8Srgb, 1024, 1024, 1);
-  lsg::ImageView<glm::u8vec3> image_view(image);
-
-  for (size_t i = 0; i < image_view.width(); i++) {
-    for (size_t j = 0; j < image_view.height(); j++) {
-      image_view.at(i, j) = glm::u8vec3(i / static_cast<float>(image_view.width()) * 255.0f,
-                                        j / static_cast<float>(image_view.height()) * 255.0, 0.0);
-    }
-  }*/
 
   auto img = renderer.render(scenes[0], 256, 256);
 
@@ -34,4 +131,4 @@ int main() {
     printf("encoder error %d: %s", error, lodepng_error_text(error));
 
   int a = 2;
-}
+}*/

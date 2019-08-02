@@ -3,46 +3,39 @@
 //
 #include "Renderer.hpp"
 #include <algorithm>
+#include <utility>
 
-lsg::Ref<lsg::Image> Renderer::render(const lsg::Ref<lsg::Scene>& scene, size_t width, size_t height) {
-  PathTracer tracer(scene);
+Renderer::Renderer(lsg::Ref<lsg::Scene> scene, size_t width, size_t height)
+  : scene_(std::move(scene)), tracer_(scene_), camTransform_(), camPerspective_(), width_(width), height_(height),
+    currentSample_(0u), pixelSampler_(width, height),
+    image_(lsg::makeRef<lsg::Image>("Out", lsg::Format::eR32G32B32Sfloat, width_, height_)), imageView_(image_) {
+  auto camera = scene_->find("Camera_Orientation");
+  camTransform_ = camera->getComponent<lsg::Transform>();
+  camPerspective_ = camera->getComponent<lsg::PerspectiveCamera>();
+}
 
-  lsg::Ref<lsg::Object> camera = scene->find("Camera_Orientation");
-  lsg::Ref<lsg::Transform> camTransform = camera->getComponent<lsg::Transform>();
-  lsg::Ref<lsg::PerspectiveCamera> camPerspective = camera->getComponent<lsg::PerspectiveCamera>();
+size_t Renderer::renderSample() {
+  std::vector<PixelSample> samples = pixelSampler_.generateSamples();
 
-  lsg::Ref<lsg::Image> image = lsg::makeRef<lsg::Image>("Image", lsg::Format::eR32G32B32Sfloat, width, height);
-  lsg::ImageView<glm::vec3> imageView(image);
+#pragma omp parallel for num_threads(8)
+  for (size_t i = 0; i < samples.size(); i++) {
+    float rX = samples[i].sample.x * 2.0 / width_ - 1; // [0, screenWidth] -> [-1, 1]
+    float rY = samples[i].sample.y * 2.0 / height_ - 1;
 
-  ImageSampler pixelSampler(width, height);
+    glm::vec3 rayDir = glm::normalize(
+      glm::vec3(rX * glm::sin(camPerspective_->fov() / 2.0f), rY * glm::sin(camPerspective_->fov() / 2.0f), -1));
+    lsg::Ray<float> ray(glm::vec3(0.0f), rayDir);
+    ray = ray.transform(camTransform_->worldMatrix());
 
-  size_t spp = 500;
-
-  for (size_t i = 0; i < spp; i++) {
-    std::vector<PixelSample> samples = pixelSampler.generateSamples();
-
-#pragma omp parallel for num_threads(4)
-    for (size_t i = 0; i < samples.size(); i++) {
-      float rX = samples[i].sample.x * 2.0 / width - 1; // [0, screenWidth] -> [-1, 1]
-      float rY = samples[i].sample.y * 2.0 / height - 1;
-
-      glm::vec3 rayDir = glm::normalize(
-        glm::vec3(rX * glm::sin(camPerspective->fov() / 2.0f), rY * glm::sin(camPerspective->fov() / 2.0f), -1));
-      lsg::Ray<float> ray(glm::vec3(0.0f), rayDir);
-      ray = ray.transform(camTransform->worldMatrix());
-
-      imageView.at(samples[i].pixel.x, height - samples[i].pixel.y - 1) += tracer.traceRay(ray) * (1.0f / spp);
-    }
+    imageView_.at(samples[i].pixel.x, samples[i].pixel.y) =
+      glm::clamp((imageView_.at(samples[i].pixel.x, samples[i].pixel.y) * static_cast<float>(currentSample_) +
+                  tracer_.traceRay(ray)) *
+                   (1.0f / static_cast<float>(currentSample_ + 1)),
+                 0.0f, 1.0f);
   }
 
-  lsg::Ref<lsg::Image> imageOut = lsg::makeRef<lsg::Image>("Image", lsg::Format::eR8G8B8Srgb, width, height);
-  lsg::ImageView<glm::u8vec3> imageOutView(imageOut);
-
-  for (size_t i = 0; i < width; i++) {
-    for (size_t j = 0; j < height; j++) {
-      imageOutView.at(i, j) = glm::clamp(imageView.at(i, j), 0.0f, 1.0f) * 255.0f;
-    }
-  }
-
-  return imageOut;
+  return ++currentSample_;
+}
+const lsg::Ref<lsg::Image>& Renderer::getImage() const {
+  return image_;
 }

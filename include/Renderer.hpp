@@ -11,7 +11,24 @@
 
 class Renderer {
  public:
-  lsg::Ref<lsg::Image> render(const lsg::Ref<lsg::Scene>& scene, size_t width, size_t height);
+  Renderer(lsg::Ref<lsg::Scene> scene, size_t width, size_t height);
+
+  size_t renderSample();
+
+  const lsg::Ref<lsg::Image>& getImage() const;
+
+ private:
+  lsg::Ref<lsg::Scene> scene_;
+  PathTracer tracer_;
+  lsg::Ref<lsg::Transform> camTransform_;
+  lsg::Ref<lsg::PerspectiveCamera> camPerspective_;
+
+  size_t width_;
+  size_t height_;
+  size_t currentSample_;
+  ImageSampler pixelSampler_;
+  lsg::Ref<lsg::Image> image_;
+  lsg::ImageView<glm::vec3> imageView_;
 };
 
 #endif // CPUPATHTRACER_RENDERER_HPP
