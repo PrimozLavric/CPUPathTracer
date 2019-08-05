@@ -27,8 +27,10 @@ class Renderer {
   size_t height_;
   size_t currentSample_;
   ImageSampler pixelSampler_;
-  lsg::Ref<lsg::Image> image_;
-  lsg::ImageView<glm::vec3> imageView_;
+  lsg::Ref<lsg::Image> accImage_;
+  lsg::ImageView<glm::vec3> accImageView_;
+  lsg::Ref<lsg::Image> outImage_;
+  lsg::ImageView<glm::vec3> outImageView_;
 };
 
 #endif // CPUPATHTRACER_RENDERER_HPP

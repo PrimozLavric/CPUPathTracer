@@ -91,8 +91,9 @@ std::optional<Intersection> RayIntersector::intersect(const lsg::Ray<float>& ray
         lsg::Ref<lsg::TriangleAccessor<glm::vec3>> triNormalAccessor =
           intersectable.mesh->geometry()->getTriangleNormalAccessor();
 
-        glm::vec3 normal =
-          computeIntersectionNormal(closestIsectPos, (*triPosAccessor)[index], (*triNormalAccessor)[index]);
+        glm::vec3 normal = glm::normalize(
+          glm::mat3(intersectable.worldMat) *
+          computeIntersectionNormal(closestIsectPos, (*triPosAccessor)[index], (*triNormalAccessor)[index]));
         closestIntersection.emplace(worldClosestIntersectionPos, normal, index, intersectable.mesh);
       }
     }

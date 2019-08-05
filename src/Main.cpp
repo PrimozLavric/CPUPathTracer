@@ -4,7 +4,9 @@
 
 #include <glad/glad.h>
 #define NOREORDER
+#include <chrono>
 #include <cppglfw/CppGLFW.h>
+#include <future>
 #include <lodepng.h>
 #include <lsg/lsg.h>
 #include <stdio.h>
@@ -37,8 +39,9 @@ void error_callback(int error, const char* description) {
   fprintf(stderr, "Error: %s\n", description);
 }
 
-static const size_t width = 800;
-static const size_t height = 600;
+static const size_t width = 1920;
+static const size_t height = 1080;
+static const float scale = 1.0f;
 
 int main() {
   cppglfw::GLFWManager& glfwManager = cppglfw::GLFWManager::instance();
@@ -49,7 +52,7 @@ int main() {
 
   glfwSetErrorCallback(error_callback);
 
-  cppglfw::Window window = glfwManager.createWindow("Window", 800, 600, hints);
+  cppglfw::Window window = glfwManager.createWindow("Window", width * scale, height * scale, hints);
   window.makeContextCurrent();
 
   if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
@@ -97,15 +100,25 @@ int main() {
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, tex);
 
-  lsg::GLTFLoader loader;
-  std::vector<lsg::Ref<lsg::Scene>> scenes = loader.load("./resources/cornell_box.gltf");
-  Renderer renderer(scenes[0], width, height);
+  std::unique_ptr<Renderer> renderer;
+
+  std::future<size_t> sample = std::async(std::launch::async, [&] {
+    lsg::GLTFLoader loader;
+    std::vector<lsg::Ref<lsg::Scene>> scenes = loader.load("./resources/cornell_box.gltf");
+    renderer = std::make_unique<Renderer>(scenes[0], width, height);
+    return renderer->renderSample();
+  });
+
+  std::cout << "Drawing" << std::endl << std::flush;
 
   while (!window.shouldClose()) {
-    size_t sample = renderer.renderSample();
-    std::cout << "Sample: " << sample << std::endl;
+    using namespace std::chrono_literals;
+    if (sample.wait_for(1s) == std::future_status::ready) {
+      std::cout << "Sample: " << sample.get() << std::endl;
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, renderer->getImage()->rawPixelData());
+      sample = std::async(std::launch::async, [&] { return renderer->renderSample(); });
+    }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, renderer.getImage()->rawPixelData());
     auto fbSize = window.getFramebufferSize();
     glViewport(0, 0, fbSize.first, fbSize.second);
     glClear(GL_COLOR_BUFFER_BIT);
