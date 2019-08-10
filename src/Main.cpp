@@ -39,8 +39,8 @@ void error_callback(int error, const char* description) {
   fprintf(stderr, "Error: %s\n", description);
 }
 
-static const size_t width = 1920;
-static const size_t height = 1080;
+static const size_t width = 800;
+static const size_t height = 600;
 static const float scale = 1.0f;
 
 int main() {
