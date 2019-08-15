@@ -84,7 +84,7 @@ glm::vec3 PathTracer::traceRay(lsg::Ray<float> ray) {
             if (r < Re) { // reflect ray from surface
                 ray = lsg::Ray<float>(intersection.position + nl * EPS, glm::reflect(ray.dir(), nl));
             } else { // transmit ray through surface
-                mask *= color * opacity;
+                mask *= color * (1.0f - opacity);
                 ray = lsg::Ray<float>(intersection.position - nl * EPS, tdir);
             }
         }
