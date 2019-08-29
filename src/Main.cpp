@@ -104,17 +104,26 @@ int main() {
 
   std::future<size_t> sample = std::async(std::launch::async, [&] {
     lsg::GLTFLoader loader;
-    std::vector<lsg::Ref<lsg::Scene>> scenes = loader.load("./resources/cornell_box.gltf");
+    std::vector<lsg::Ref<lsg::Scene>> scenes = loader.load("./resources/CornellBox/cornell.gltf");
     renderer = std::make_unique<Renderer>(scenes[0], width, height);
     return renderer->renderSample();
   });
 
   std::cout << "Drawing" << std::endl << std::flush;
 
+  std::chrono::time_point<std::chrono::high_resolution_clock> startTime = std::chrono::high_resolution_clock::now();
   while (!window.shouldClose()) {
     using namespace std::chrono_literals;
-    if (sample.wait_for(1s) == std::future_status::ready) {
-      std::cout << "Sample: " << sample.get() << std::endl;
+    if (sample.wait_for(3s) == std::future_status::ready) {
+      size_t sample_v = sample.get();
+      std::cout << "Sample: " << sample_v << std::endl;
+
+      if (sample_v % 10 == 0) {
+        float dt = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime)
+          .count() / 1000.0f;
+        std::cout << "Samples per second: " << sample_v / dt << std::endl;
+      }
+
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, renderer->getImage()->rawPixelData());
       sample = std::async(std::launch::async, [&] { return renderer->renderSample(); });
     }

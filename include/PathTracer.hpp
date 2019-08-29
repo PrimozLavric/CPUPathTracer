@@ -36,11 +36,10 @@ public:
 
 protected:
     enum class InteractionType {
-        kDiff, kSpec, kLight, kRefr
+        kDiff, kSpec, kRefr
     };
 
-    InteractionType
-    determineInteractionType(float roughnessFactor, float metallicFactor, glm::vec3 emissiveFactor, float opacity);
+    InteractionType determineInteractionType(float metallicFactor, float transmissionFactor);
 
     float
     calcFresnelReflectance(glm::vec3 n, glm::vec3 nl, glm::vec3 rayDirection, float nc, float nt, glm::vec3 &tdir);

@@ -31,15 +31,13 @@ glm::vec3 PathTracer::traceRay(lsg::Ray<float> ray) {
         }
 
         glm::vec3 color = material->baseColorFactor();
-        float opacity = material->baseColorFactor()[3];
 
         InteractionType interaction =
-                determineInteractionType(material->roughnessFactor(), material->metallicFactor(),
-                                         material->emissiveFactor(), opacity);
+                determineInteractionType(material->metallicFactor(), material->transmissionFactor());
 
-        if (interaction == InteractionType::kLight) {
-            accColor = mask * material->emissiveFactor() * 10.0f;
-        } else if (interaction == InteractionType::kDiff) {
+        accColor = mask * material->emissiveFactor() * 10.0f;
+
+        if (interaction == InteractionType::kDiff) {
             float r1 = 2.0f * glm::pi<float>() *
                        random(0.0f,
                               1.0f); // pick random number on unit circle (radius = 1, circumference = 2*Pi) for azimuth
@@ -70,7 +68,7 @@ glm::vec3 PathTracer::traceRay(lsg::Ray<float> ray) {
             ray = lsg::Ray<float>(intersection.position + nl * EPS, glm::reflect(ray.dir(), nl));
         } else if (interaction == InteractionType::kRefr) {
             float nc = 1.0f;
-            float nt = 1.5f;
+            float nt = material->ior();
             glm::vec3 nl = glm::dot(intersection.normal, ray.dir()) < 0.0f
                            ? intersection.normal
                            : intersection.normal * -1.0f; // front facing normal
@@ -84,7 +82,7 @@ glm::vec3 PathTracer::traceRay(lsg::Ray<float> ray) {
             if (r < Re) { // reflect ray from surface
                 ray = lsg::Ray<float>(intersection.position + nl * EPS, glm::reflect(ray.dir(), nl));
             } else { // transmit ray through surface
-                mask *= color * (1.0f - opacity);
+                mask *= color * material->transmissionFactor();
                 ray = lsg::Ray<float>(intersection.position - nl * EPS, tdir);
             }
         }
@@ -102,27 +100,24 @@ glm::vec3 PathTracer::traceRay(lsg::Ray<float> ray) {
     return accColor;
 }
 
-PathTracer::InteractionType PathTracer::determineInteractionType(float roughnessFactor, float metallicFactor,
-                                                                 glm::vec3 emissiveFactor, float opacity) {
-    if (opacity < 1.0f) {
-        return InteractionType::kRefr;
-    }
+PathTracer::InteractionType PathTracer::determineInteractionType(float metallicFactor, float transmissionFactor) {
+  float metallicBRDF = metallicFactor;
+  float transmissionBSDF = (1.0f - metallicFactor) * transmissionFactor;
+  float dielectricBRDF = (1.0f - transmissionFactor) * (1.0f - metallicFactor);
 
-    float avgEmissiveFactor = glm::compAdd(emissiveFactor) / 3.0f;
-    float maxRand = roughnessFactor + metallicFactor + avgEmissiveFactor;
-    if (maxRand == 0.0f) {
-        return InteractionType::kDiff;
-    }
+  float norm = 1.0f / (metallicBRDF + transmissionBSDF + dielectricBRDF);
+  metallicBRDF *= norm;
+  transmissionBSDF *= norm;
 
-    float r = random(0.0f, maxRand);
+  float r = random(0.0, 1.0);
 
-    if (r < roughnessFactor) {
-        return InteractionType::kDiff;
-    } else if (r < roughnessFactor + metallicFactor) {
-        return InteractionType::kSpec;
-    } else {
-        return InteractionType::kLight;
-    }
+  if (r < metallicBRDF) {
+    return InteractionType::kSpec;
+  } else if (r < metallicBRDF + transmissionBSDF) {
+    return InteractionType::kRefr;
+  } else {
+    return InteractionType::kDiff;
+  }
 }
 
 float PathTracer::calcFresnelReflectance(glm::vec3 n, glm::vec3 nl, glm::vec3 rayDirection, float nc, float nt,
